@@ -11,5 +11,5 @@ library(shiny) library(httr) library(jsonlite) library(dplyr) library(ggplot2)
 ```
 
 ```{r}
-shiny::runGitHub(repo = "Project1", username = "Ncsueric")
+shiny::runGitHub(repo = "Project2", username = "Ncsueric")
 ```
