@@ -4,6 +4,106 @@ format: html
 editor: visual
 ---
 
-## Quarto
+###　Find Data You Are Interested In
 
-Quarto enables you to weave together content and executable code into a finished document. To learn
+```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+
+
+
+
+
+```{r}
+query <-function(apiKey,endpoint,city) {
+  baseURL <- "https://api.openweathermap.org/data/2.5/"
+  endpoint <- endpoint
+  city <-city
+  fullURL <- paste0(baseURL, endpoint , "?q=", city, "&appid=", apiKey)
+
+  
+  response <- GET(fullURL)
+  data <- fromJSON(content(response, "text"))
+
+  forecasts <- data$list
+  main_df <- bind_rows(forecasts$main)
+  weather_df <- bind_rows(forecasts$weather)
+  sys_df <- bind_rows(forecasts$sys)
+  other_fields <- data.frame(
+    dt = forecasts$dt
+  )
+  
+  other_fields$real_date <- as.POSIXct(other_fields$dt, origin = "1970-01-01", tz = "UTC")
+  
+  weather_data <- bind_cols(other_fields, main_df,weather_df,sys_df)
+  
+  }
+  
+  # Print the final dataframe
+
+apiKey <- "604461d0ebb7cc283161c3a91ffb7c2b"
+  
+weather_data <-query("604461d0ebb7cc283161c3a91ffb7c2b","forecast","London")
+
+print(weather_data)
+  
+
+```
+
+### Know How to Summarize the Data
+
+####　You should create some contingency tables
+```{r}
+contingency_table <- table(weather_data$main, weather_data$pod)
+print(contingency_table)
+```
+#### You should create numerical summaries for some quantitative variables at each setting of some of your categorical variables
+```{r}
+temp_by_main <- weather_data |>
+  group_by(main) |>
+  summarise(
+    min_temp = min(temp),
+    q1_temp = quantile(temp, 0.25),
+    median_temp = median(temp),
+    mean_temp = mean(temp),
+    q3_temp = quantile(temp, 0.75),
+    max_temp = max(temp)
+  )
+
+print(temp_by_main)
+```
+#### You should create at least four plots utilizing coloring, grouping, etc. All plots should have nice labels and titles.
+
+```{r}
+ggplot(weather_data, aes(x = real_date, y = temp)) +
+  geom_line() +
+  geom_point() +
+  labs(title = "Temperature by time",
+       x = "time",
+       y = "Temperature")
+```
+
+
+```{r}
+ggplot(weather_data, aes(x = pod, fill = main))+
+  geom_bar()+
+   labs(x = "Day or Night", fill="weather")
+```
+```{r}
+ggplot(weather_data, aes(x = pod, fill = main))+
+  geom_bar(position = "fill")+
+   labs(x = "Day or Night" )+
+   scale_fill_discrete("Weather")
+```
+```{r}
+ggplot(weather_data, aes(x = pod, y = temp,fill=pod))+
+   geom_boxplot() +
+   labs(x = "Day or Night" ,fill="Day or Night")+
+   geom_jitter(width = 0.2, alpha = 0.3)
+```
+
