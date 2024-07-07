@@ -2,15 +2,11 @@
 # This is the server logic of a Shiny web application. You can run the
 # application by clicking 'Run App' above.
 #
-# Find out more about building applications with Shiny here:
-#
-#    https://shiny.posit.co/
-#
-
 library(shiny)
 library(httr)
 library(jsonlite)
 library(dplyr)
+library(ggplot2)
 
 # Function to query weather data
 query <- function(apiKey, endpoint, city) {
@@ -34,13 +30,12 @@ query <- function(apiKey, endpoint, city) {
   return(weather_data)
 }
 
-server <- function(input, output) {
- 
-   #for Data Download
-  
+server <- function(input, output, session) {
+  # Reactive values to store data
   weatherData <- reactiveVal()
   subsetData <- reactiveVal()
   
+  # Fetch data event
   observeEvent(input$fetchData, {
     apiKey <- input$apiKey
     endpoint <- input$endpoint
@@ -49,8 +44,14 @@ server <- function(input, output) {
     data <- query(apiKey, endpoint, city)
     weatherData(data)
     subsetData(data)
+    
+    # Update selectInput choices based on the queried dataset
+    updateSelectInput(session, "xvar", choices = names(data))
+    updateSelectInput(session, "yvar", choices = names(data))
+    updateSelectInput(session, "facetVar", choices = c("None", names(data)))
   })
   
+  # Subset data event
   observeEvent(input$subsetData, {
     data <- weatherData()
     rows <- as.integer(unlist(strsplit(input$subsetRows, ",")))
@@ -66,14 +67,17 @@ server <- function(input, output) {
     subsetData(data)
   })
   
+  # Render fetched data table
   output$dataTable <- renderTable({
     weatherData()
   })
   
+  # Render subset data table
   output$subsetTable <- renderTable({
     subsetData()
   })
   
+  # Download subset data
   output$downloadData <- downloadHandler(
     filename = function() {
       paste("weather_data", Sys.Date(), ".csv", sep = "")
@@ -83,4 +87,47 @@ server <- function(input, output) {
     }
   )
   
+  # Generate the plot based on user inputs
+  output$plot <- renderPlot({
+    data <- weatherData()
+    req(data)
+    xvar <- input$xvar
+    yvar <- input$yvar
+    facetVar <- input$facetVar
+    plotType <- input$plotType
+    
+    p <- ggplot(data, aes_string(x = xvar, y = yvar)) 
+    
+    if (plotType == "Scatterplot") {
+      p <- p + geom_point()
+    } else if (plotType == "Boxplot") {
+      p <- p + geom_boxplot()
+    } else if (plotType == "Histogram") {
+      p <- p + geom_histogram(binwidth = 1)
+    }
+    
+    if (facetVar != "None") {
+      p <- p + facet_wrap(as.formula(paste("~", facetVar)))
+    }
+    
+    print(p)
+  })
+  
+  # Generate the numerical summary based on user inputs
+  output$summary <- renderPrint({
+    data <- weatherData()
+    req(data)
+    xvar <- input$xvar
+    yvar <- input$yvar
+    summaryType <- input$summaryType
+    
+    if (summaryType == "Summary") {
+      summary(data[, c(xvar, yvar)])
+    } else if (summaryType == "Mean") {
+      colMeans(data[, c(xvar, yvar)], na.rm = TRUE)
+    } else if (summaryType == "Median") {
+      apply(data[, c(xvar, yvar)], 2, median, na.rm = TRUE)
+    }
+  })
 }
+
