@@ -50,6 +50,11 @@ apiKey <- "604461d0ebb7cc283161c3a91ffb7c2b"
   
 weather_data <-query("604461d0ebb7cc283161c3a91ffb7c2b","forecast","London")
 
+weather_data <- weather_data|>
+  select(real_date,temp,feels_like,pressure,sea_level,humidity,description,pod)
+
+names(weather_data) <- c("Date and time", "Temperature","Feels like","Pressure","Atmospheric pressure on the sea level","Humidity","Weather Condition within the Group","Day or Night")
+
 print(weather_data)
   
 

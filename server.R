@@ -7,6 +7,7 @@ library(httr)
 library(jsonlite)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
 
 # Function to query weather data
 query <- function(apiKey, endpoint, city) {
@@ -27,6 +28,12 @@ query <- function(apiKey, endpoint, city) {
   other_fields$real_date <- as.POSIXct(other_fields$dt, origin = "1970-01-01", tz = "UTC")
   
   weather_data <- bind_cols(other_fields, main_df, weather_df, sys_df)
+  
+  weather_data <- weather_data|>
+    select(real_date,temp,feels_like,pressure,sea_level,humidity,description,pod)
+  
+  names(weather_data) <- c("Date_and_time", "Temperature","Feels_like","Pressure","Atmospheric_pressure_on_the_sea_level","Humidity","Weather_Condition_within_the_Group","Day_or_Night")
+  
   return(weather_data)
 }
 
@@ -101,9 +108,9 @@ server <- function(input, output, session) {
     if (plotType == "Scatterplot") {
       p <- p + geom_point()
     } else if (plotType == "Boxplot") {
-      p <- p + geom_boxplot()
-    } else if (plotType == "Histogram") {
-      p <- p + geom_histogram(binwidth = 1)
+      p <- p + geom_boxplot()+geom_jitter(width = 0.2, alpha = 0.3)
+    } else if (plotType == "Lineplot") {
+      p <- p + geom_line()
     }
     
     if (facetVar != "None") {
@@ -121,13 +128,19 @@ server <- function(input, output, session) {
     yvar <- input$yvar
     summaryType <- input$summaryType
     
-    if (summaryType == "Summary") {
-      summary(data[, c(xvar, yvar)])
-    } else if (summaryType == "Mean") {
-      colMeans(data[, c(xvar, yvar)], na.rm = TRUE)
-    } else if (summaryType == "Median") {
-      apply(data[, c(xvar, yvar)], 2, median, na.rm = TRUE)
-    }
+    summary_table <- data %>%
+      group_by(.data[[xvar]]) %>%
+      summarise(
+        Mean = mean(.data[[yvar]], na.rm = TRUE),
+        Median = median(.data[[yvar]], na.rm = TRUE),
+        Min = min(.data[[yvar]], na.rm = TRUE),
+        Max = max(.data[[yvar]], na.rm = TRUE),
+        SD = sd(.data[[yvar]], na.rm = TRUE)
+      ) %>%
+      pivot_longer(cols = -1, names_to = "Statistic", values_to = "Value") %>%
+      pivot_wider(names_from = .data[[xvar]], values_from = Value)
+    
+    print(summary_table)
   })
 }
 
